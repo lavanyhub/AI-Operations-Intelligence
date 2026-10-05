@@ -55,3 +55,35 @@ def cancellations_monthly():
         GROUP BY month
         ORDER BY month
     """)
+@app.get("/payments/failure-reasons")
+def payment_failure_reasons():
+    return run_query("""
+        SELECT TO_CHAR(date, 'YYYY-MM') AS month,
+               failure_reason,
+               COUNT(*) AS failed
+        FROM payments
+        WHERE status = 'failed'
+        GROUP BY month, failure_reason
+        ORDER BY month, failure_reason
+    """)
+
+
+@app.get("/tickets/by-category")
+def tickets_by_category():
+    return run_query("""
+        SELECT TO_CHAR(created_at, 'YYYY-MM') AS month,
+               category,
+               COUNT(*) AS tickets
+        FROM support_tickets
+        GROUP BY month, category
+        ORDER BY month, category
+    """)
+
+
+@app.get("/incidents")
+def list_incidents():
+    return run_query("""
+        SELECT incident_id, start_time, end_time, service, severity, description
+        FROM incidents
+        ORDER BY start_time
+    """)
