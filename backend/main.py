@@ -1,8 +1,10 @@
 import os
 
+import numpy as np
 import psycopg
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
+from fastembed import TextEmbedding
 from psycopg.rows import dict_row
 
 load_dotenv()  # reads the .env file
@@ -86,4 +88,53 @@ def list_incidents():
         SELECT incident_id, start_time, end_time, service, severity, description
         FROM incidents
         ORDER BY start_time
+    """)
+_model = None
+
+
+def get_model():
+    """Load the embedding model once and reuse it."""
+    global _model
+    if _model is None:
+        _model = TextEmbedding("BAAI/bge-small-en-v1.5")
+    return _model
+
+
+@app.get("/documents/search")
+def search_documents(q: str = Query(..., min_length=3),
+                     limit: int = Query(5, ge=1, le=20)):
+    chunks = run_query(
+        "SELECT doc_path, doc_type, content, embedding FROM document_chunks"
+    )
+    if not chunks:
+        return []
+    vec = list(get_model().query_embed(q))[0]
+    vec = vec / np.linalg.norm(vec)
+    matrix = np.array([c["embedding"] for c in chunks])
+    scores = matrix @ vec
+    best = np.argsort(-scores)[:limit]
+    return [
+        {
+            "score": round(float(scores[i]), 3),
+            "doc_path": chunks[i]["doc_path"],
+            "doc_type": chunks[i]["doc_type"],
+            "content": chunks[i]["content"],
+        }
+        for i in best
+    ]
+@app.get("/cancellations/after-failed-payment")
+def cancellations_after_failed_payment():
+    return run_query("""
+        SELECT TO_CHAR(s.end_date, 'YYYY-MM') AS month,
+               COUNT(DISTINCT s.subscription_id) AS cancellations,
+               COUNT(DISTINCT s.subscription_id)
+                   FILTER (WHERE p.payment_id IS NOT NULL) AS after_failed_payment
+        FROM subscriptions s
+        LEFT JOIN payments p
+               ON p.customer_id = s.customer_id
+              AND p.status = 'failed'
+              AND p.date BETWEEN s.end_date - 14 AND s.end_date
+        WHERE s.status = 'cancelled'
+        GROUP BY month
+        ORDER BY month
     """)
