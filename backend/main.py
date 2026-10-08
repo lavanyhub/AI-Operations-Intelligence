@@ -9,8 +9,7 @@ from psycopg.rows import dict_row
 
 load_dotenv()  # reads the .env file
 
-
-def run_query(sql):
+def run_query(sql, params=None):          # <-- change 1
     """Open a connection to PostgreSQL, run one SQL query, return rows."""
     with psycopg.connect(
         host=os.getenv("DB_HOST"),
@@ -21,7 +20,7 @@ def run_query(sql):
         row_factory=dict_row,
     ) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            cur.execute(sql, params)      # <-- change 2
             return cur.fetchall()
 
 
@@ -138,3 +137,12 @@ def cancellations_after_failed_payment():
         GROUP BY month
         ORDER BY month
     """)
+@app.get("/documents/by-month")
+def documents_by_month(month: str = Query(..., pattern=r"^\d{4}-\d{2}$")):
+    key = month.replace("-", "_")
+    return run_query("""
+        SELECT doc_path, doc_type, content
+        FROM document_chunks
+        WHERE strpos(doc_path, %s) > 0
+        ORDER BY doc_path, chunk_index
+    """, (key,))

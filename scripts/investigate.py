@@ -56,17 +56,35 @@ def doc_queries(target, facts):
     return list(dict.fromkeys(queries))  # remove duplicates, keep order
 
 
+MIN_CHARS = 140   # skip tiny chunks (just a title and dates); they carry no information
+PER_QUESTION = 6  # how many results to ask for per question
+MAX_EXCERPTS = 12
+
+
+MIN_CHARS = 140   # skip tiny chunks (just a title and dates); they carry no information
+PER_QUESTION = 6  # how many results to ask for per question
+MAX_EXCERPTS = 12
+
+
 def gather_docs(target, facts):
-    seen = {}
-    for q in doc_queries(target, facts):
-        for hit in get("/documents/search", q=q, limit=3):  # top 3 per question
-            key = (hit["doc_path"], hit["content"])
-            if key not in seen or hit["score"] > seen[key]["score"]:
-                seen[key] = hit
-    hits = sorted(seen.values(), key=lambda h: -h["score"])[:10]
-    return [{"document": h["doc_path"], "text": h["content"][:450]} for h in hits]
-
-
+    # 1. documents dated in the month being investigated: a lookup, not a search by meaning
+    chosen = [h for h in get("/documents/by-month", month=target)]
+    seen = {(h["doc_path"], h["content"]) for h in chosen}
+    # 2. search by meaning for everything else
+    results = [get("/documents/search", q=q, limit=PER_QUESTION)
+               for q in doc_queries(target, facts)]
+    for rank in range(PER_QUESTION):          # take turns between the questions
+        for hits in results:
+            if rank >= len(hits):
+                continue
+            h = hits[rank]
+            key = (h["doc_path"], h["content"])
+            if key in seen or len(h["content"]) < MIN_CHARS:
+                continue
+            seen.add(key)
+            chosen.append(h)
+    return [{"document": h["doc_path"], "text": h["content"][:450]}
+            for h in chosen[:MAX_EXCERPTS]]
 # ------------------------------------------------------------ 2. calculate
 def compute(raw, target):
     by_month = lambda rows, key: {r["month"]: r[key] for r in rows}
