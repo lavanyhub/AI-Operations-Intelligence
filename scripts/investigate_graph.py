@@ -68,7 +68,12 @@ Rules:
 - If a statement explains why a share is over 100%, include that explanation.
 - Mention whether other ticket categories (including pricing) changed.
 - Use the document excerpts for what happened (root cause, timeline) and name the document.
-- FINDING: one or two sentences. EVIDENCE: 5 to 7 bullets. ANALYSIS: how the evidence connects, plus the caveats.
+- Name the release from the release notes that changed the payment gateway integration (for example "after the October 1 release") as what the failures followed.
+- The incident report calls the cause a "preliminary root cause". Write "preliminary root cause" or "the likely explanation", never just "the root cause".
+- Only attach a date to an incident (INC-...) if that date appears in that incident's own excerpt.
+- State that "after a failed payment" means a failed payment in the 14 days before cancelling, and that this window is an assumption.
+- Every number in the key statements must appear somewhere in the report.
+- FINDING: one or two sentences. Say what happened and what it is linked to (the payment gateway problems after the release). EVIDENCE: 5 to 7 bullets. ANALYSIS: how the evidence connects, plus the caveats.
 - CONFIDENCE: use the label "{facts['confidence']['label']}" and the checks that passed.
 - RECOMMENDATION: 2 or 3 actions taken from the follow-up actions in the documents or directly from the evidence. Do not invent generic advice.
 - Do not repeat the same sentence in different sections."""
@@ -95,9 +100,23 @@ def find_problems(report, facts, docs):
     causal = vr.causal_words(report)
     if causal:
         problems.append(f"Remove the causal wording {causal}. Use 'linked to' or 'followed'.")
+    if not vr.names_release(report):
+        problems.append("Name the release that changed the payment gateway integration, "
+                        "for example 'after the October 1 release' (see the release notes). "
+                        "Say 'linked to' or 'followed', not that it caused anything.")
     if not re.search(r"14[- ]day|14 days", report, re.I):
         problems.append("State that 'after a failed payment' means a failed payment in the "
                         "14 days before cancelling, and that this window is an assumption.")
+    for wrong_date in vr.wrong_source_dates(report, docs):
+        problems.append(f"{wrong_date}. Cite the date to the incident it comes from, "
+                        "or leave out the incident reference.")
+    if vr.root_cause_overstated(report):
+        problems.append("The incident report calls the cause a 'preliminary root cause'. "
+                        "Write 'preliminary root cause', or call it 'the likely explanation'.")
+    if not vr.finding_names_cause(report):
+        problems.append("The FINDING must also say what the increase is linked to: the payment "
+                        "gateway problems after the October 1 release. Say 'linked to', "
+                        "not 'caused by'.")
     return problems
 
 
