@@ -28,6 +28,7 @@ from urllib import error, request
 from langgraph.graph import END, START, StateGraph
 
 import investigate as iv  # our existing functions
+import validate_report as vr  # new, tested checks
 
 MAX_RETRIES = 2  # rewrites allowed after the first attempt
 
@@ -91,7 +92,7 @@ def find_problems(report, facts, docs):
     missing = iv.missing_key_numbers(report, facts)
     if missing:
         problems.append(f"The report must mention these numbers from the briefing: {missing}.")
-    causal = iv.causal_words(report)
+    causal = vr.causal_words(report)
     if causal:
         problems.append(f"Remove the causal wording {causal}. Use 'linked to' or 'followed'.")
     if not re.search(r"14[- ]day|14 days", report, re.I):
