@@ -81,12 +81,19 @@ def wrong_source_dates(report, docs):
 
 
 # ---------------------------------------------------------------- root cause wording
-def root_cause_overstated(report):
-    """Sentences that say 'root cause' without 'preliminary' (the incident report only
-    calls it a preliminary root cause)."""
-    return [s.strip() for s in _sentences(report)
-            if re.search(r"root cause", s, re.I) and not re.search(r"preliminary", s, re.I)]
+_ACTION_BEFORE_ROOT_CAUSE = re.compile(
+    r"\b(identify|investigate|find|determine|confirm|establish|uncover|understand|diagnose)\b"
+    r"(?:\W+\w+){0,3}?\W+root cause", re.I)
 
+
+def root_cause_overstated(report):
+    """Sentences that claim a 'root cause' without 'preliminary' (the incident report only
+    calls it a preliminary root cause). Sentences that only recommend finding it,
+    like 'identify the root cause', are not claims and are skipped."""
+    return [s.strip() for s in _sentences(report)
+            if re.search(r"root cause", s, re.I)
+            and not re.search(r"preliminary", s, re.I)
+            and not _ACTION_BEFORE_ROOT_CAUSE.search(s)]
 
 # ---------------------------------------------------------------- FINDING gives the why
 def finding_names_cause(report):

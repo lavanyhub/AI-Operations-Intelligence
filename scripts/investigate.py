@@ -65,12 +65,41 @@ MIN_CHARS = 140   # skip tiny chunks (just a title and dates); they carry no inf
 PER_QUESTION = 6  # how many results to ask for per question
 MAX_EXCERPTS = 12
 
+def month_bounds(target):
+    start = datetime.strptime(target + "-01", "%Y-%m-%d")
+    end = datetime(start.year + (start.month == 12), start.month % 12 + 1, 1)
+    return start, end
+
+
+def incident_windows():
+    data = get("/incidents")
+    if isinstance(data, dict):
+        data = data.get("value", [])
+    return {i["incident_id"]: (datetime.fromisoformat(i["start_time"]),
+                               datetime.fromisoformat(i["end_time"])) for i in data}
+
+
+def belongs_to_month(hit, target, windows):
+    """False only when the document is clearly about a different month."""
+    start, end = month_bounds(target)
+    # file names that carry a month, like ..._2026_10_... or ...2026-10...
+    months = re.findall(r"(20\d\d)[_-](0[1-9]|1[0-2])", hit["doc_path"])
+    if months:
+        return any(f"{y}-{m}" == target for y, m in months)
+    # incident documents: keep only if that incident overlaps the target month
+    ids = [i for i in set(re.findall(r"INC-\d+", hit["doc_path"] + " " + hit["content"]))
+           if i in windows]
+    if ids:
+        return any(windows[i][0] < end and windows[i][1] >= start for i in ids)
+    return True   # policies and other undated documents stay
+
 
 def gather_docs(target, facts):
     # 1. documents dated in the month being investigated: a lookup, not a search by meaning
     chosen = [h for h in get("/documents/by-month", month=target)]
     seen = {(h["doc_path"], h["content"]) for h in chosen}
-    # 2. search by meaning for everything else
+    windows = incident_windows()
+    # 2. search by meaning for everything else, skipping documents about other months
     results = [get("/documents/search", q=q, limit=PER_QUESTION)
                for q in doc_queries(target, facts)]
     for rank in range(PER_QUESTION):          # take turns between the questions
@@ -80,6 +109,8 @@ def gather_docs(target, facts):
             h = hits[rank]
             key = (h["doc_path"], h["content"])
             if key in seen or len(h["content"]) < MIN_CHARS:
+                continue
+            if not belongs_to_month(h, target, windows):
                 continue
             seen.add(key)
             chosen.append(h)

@@ -1,25 +1,25 @@
-FINDING
-Customer cancellations increased in 2026-10, with 1659 cancellations against a normal 1193.3 per month, an increase of 465.7 (39.0%). This increase is linked to the payment gateway problems after the October 1 release.
+**FINDING**
+Customer cancellations increased in 2026-10, with 1659 cancellations against a normal 1193.3 per month, a 39.0% increase. This increase is linked to the payment gateway problems after the October 1 release.
 
-EVIDENCE
+**EVIDENCE**
 • Cancellations that came after a failed payment increased by 518.2, which equals 111.3% of the total increase of 465.7. This is because cancellations without a failed payment fell from a normal 957.6 to 905.
 • The payment failure rate was 6.0% against a normal 2.1%, with 2358 failed payments against a normal 807.6.
 • Failures with reason gateway_timeout increased to 1506 this month, against 0 in a normal month.
 • Payment tickets rose by 187.3% to 931 against a normal 324.
-• No other ticket category changed by more than 7.7%, including pricing (0.6%).
+• No other ticket category changed by more than 7.7%, including pricing (0.6% change).
 
-ANALYSIS
-The evidence suggests that the payment gateway problems after the October 1 release led to an increase in cancellations. The preliminary root cause of the payment gateway failures was a shorter request timeout than the gateway needs to respond under load (INC-007). The likely explanation is that requests were cancelled before the gateway could confirm them. After the October 1 release, the payment gateway integration was upgraded to the vendor's v2 API, which included new retry logic and a shorter request timeout (release_notes/release_2026_10.md). This change was followed by a 4-hour outage on October 1 (INC-007) and intermittent payment gateway timeouts after a hotfix on October 2 (INC-008). The increase in cancellations after a failed payment is likely linked to the payment gateway problems, as customers trying to pay or renew during the window saw errors or timeouts at checkout (INC-007). The assumption is that "after a failed payment" means a failed payment in the 14 days before cancelling, and this window is an assumption. The data shows association, not proof of cause.
+**ANALYSIS**
+The evidence suggests that the payment gateway problems after the October 1 release led to an increase in cancellations, particularly those linked to failed payments. The preliminary root cause of the payment gateway failures was a shorter request timeout than the gateway needs to respond under load (INC-007). The likely explanation is that requests were cancelled before the gateway could confirm them. After a failed payment, cancellations increased by 518.2, which is a significant portion of the total increase. This is an association, not proof of cause. The data is synthetic and cleaner than real company data. The assumption is that "after a failed payment" means a failed payment in the 14 days before cancelling.
 
-CONFIDENCE
+**CONFIDENCE**
 The confidence in this finding is High, as the following checks passed:
 - Payment-linked cancellations explain at least half of the increase.
 - A failure reason that never appeared before showed up this month (gateway_timeout).
 - Payment tickets rose by at least 50%.
 - A payment-related incident started this month (INC-007).
 
-RECOMMENDATION
-Based on the follow-up actions in the documents, the following actions are recommended:
+**RECOMMENDATION**
+Based on the follow-up actions in the incident reports, the following actions are recommended:
 - Investigate remaining intermittent timeouts (INC-008).
 - Review whether automatic payment retries ran as designed during the window (INC-007).
 - Add a gateway timeout check to the release checklist (INC-007).
@@ -30,7 +30,7 @@ Checks after 1 attempt(s): Final report passed all checks.
 Run trace:
 - gather_evidence: 6 endpoints read, month 2026-10
 - calculate: confidence High
-- find_documents: 12 excerpts
+- find_documents: 11 excerpts
 - write: attempt 1
 - check: clean
 

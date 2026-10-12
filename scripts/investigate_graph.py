@@ -53,6 +53,20 @@ def build_messages(facts, docs):
               "invent numbers. If something is not provided, say it is not available.")
     briefing = {"key_statements": facts["key_statements"],
                 "confidence": facts["confidence"], "caveats": facts["caveats"]}
+    # a clear story (Medium or High confidence) gets the story rules; a calm month (Low) must not be given one
+    story = facts["confidence"]["label"] != "Low"
+    if story:
+        finding_rule = ("- FINDING: one or two sentences. Say what happened and what it is linked to "
+                        "(the payment gateway problems after the release). EVIDENCE: 5 to 7 bullets. "
+                        "ANALYSIS: how the evidence connects, plus the caveats.")
+        story_rules = ('- Name the release from the release notes that changed the payment gateway integration '
+                       '(for example "after the October 1 release") as what the failures followed.')
+    else:
+        finding_rule = ("- FINDING: one or two sentences. Say how much cancellations changed and whether the "
+                        "evidence points to a clear cause. EVIDENCE: 5 to 7 bullets. "
+                        "ANALYSIS: how the evidence connects, plus the caveats.")
+        story_rules = ("- The confidence is Low. Say plainly that the change is small or that no clear cause was "
+                       "found. Do not invent a cause, an incident or a story that the briefing does not support.")
     user = f"""Question: Why did customer cancellations increase in {facts['month']}?
 
 BRIEFING (calculated by code, trustworthy):
@@ -68,12 +82,12 @@ Rules:
 - If a statement explains why a share is over 100%, include that explanation.
 - Mention whether other ticket categories (including pricing) changed.
 - Use the document excerpts for what happened (root cause, timeline) and name the document.
-- Name the release from the release notes that changed the payment gateway integration (for example "after the October 1 release") as what the failures followed.
+{story_rules}
 - The incident report calls the cause a "preliminary root cause". Write "preliminary root cause" or "the likely explanation", never just "the root cause".
 - Only attach a date to an incident (INC-...) if that date appears in that incident's own excerpt.
 - State that "after a failed payment" means a failed payment in the 14 days before cancelling, and that this window is an assumption.
 - Every number in the key statements must appear somewhere in the report.
-- FINDING: one or two sentences. Say what happened and what it is linked to (the payment gateway problems after the release). EVIDENCE: 5 to 7 bullets. ANALYSIS: how the evidence connects, plus the caveats.
+{finding_rule}
 - CONFIDENCE: use the label "{facts['confidence']['label']}" and the checks that passed.
 - RECOMMENDATION: 2 or 3 actions taken from the follow-up actions in the documents or directly from the evidence. Do not invent generic advice.
 - Do not repeat the same sentence in different sections."""
@@ -91,6 +105,7 @@ def chat(messages):
 
 def find_problems(report, facts, docs):
     problems = []
+    story = facts["confidence"]["label"] != "Low"   # story checks only when the evidence shows a story
     bad = iv.unverified_numbers(report, facts, docs)
     if bad:
         problems.append(f"These numbers are not in the briefing: {bad}. Remove or correct them.")
@@ -100,7 +115,7 @@ def find_problems(report, facts, docs):
     causal = vr.causal_words(report)
     if causal:
         problems.append(f"Remove the causal wording {causal}. Use 'linked to' or 'followed'.")
-    if not vr.names_release(report):
+    if story and not vr.names_release(report):
         problems.append("Name the release that changed the payment gateway integration, "
                         "for example 'after the October 1 release' (see the release notes). "
                         "Say 'linked to' or 'followed', not that it caused anything.")
@@ -113,7 +128,7 @@ def find_problems(report, facts, docs):
     if vr.root_cause_overstated(report):
         problems.append("The incident report calls the cause a 'preliminary root cause'. "
                         "Write 'preliminary root cause', or call it 'the likely explanation'.")
-    if not vr.finding_names_cause(report):
+    if story and not vr.finding_names_cause(report):
         problems.append("The FINDING must also say what the increase is linked to: the payment "
                         "gateway problems after the October 1 release. Say 'linked to', "
                         "not 'caused by'.")

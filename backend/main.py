@@ -25,6 +25,16 @@ def run_query(sql, params=None):          # <-- change 1
 
 
 app = FastAPI(title="NovaFlow Operations API")
+from fastapi.middleware.cors import CORSMiddleware
+try:
+    from backend.investigations import router as investigations_router
+except ImportError:
+    from investigations import router as investigations_router
+
+app.add_middleware(CORSMiddleware,
+                   allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+                   allow_methods=["*"], allow_headers=["*"])
+app.include_router(investigations_router)
 
 
 @app.get("/")
