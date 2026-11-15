@@ -29,6 +29,7 @@ from langgraph.graph import END, START, StateGraph
 
 import investigate as iv  # our existing functions
 import validate_report as vr  # new, tested checks
+import audit_trail as au  # audit trail
 
 MAX_RETRIES = 2  # rewrites allowed after the first attempt
 
@@ -43,6 +44,7 @@ class State(TypedDict, total=False):
     report: str            # latest report
     problems: list         # what the checks found
     attempt: int           # how many times the model has written
+    attempts: Annotated[list, operator.add]   # one record per attempt, for the audit trail
     log: Annotated[list, operator.add]   # run trace; each node ADDS lines
 
 
@@ -174,10 +176,11 @@ def check(state):
     print(f"[check] " + ("clean" if not problems else f"{len(problems)} problem(s):"))
     for p in problems:
         print("    - " + p)
-    return {"problems": problems,
+        return {"problems": problems,
+            "attempts": [{"attempt": state["attempt"], "at": au.now(),
+                          "report": state["report"], "problems": problems}],
             "log": [f"check: {len(problems)} problem(s)" if problems else "check: clean"]}
-
-
+    
 def decide(state) -> Literal["finish", "revise", "give_up"]:
     """The conditional edge: where to go after the check."""
     if not state["problems"]:
@@ -196,6 +199,7 @@ def revise(state):
 
 
 def save(state):
+    au.write_audit(state, iv.ROOT, iv.MODEL)
     problems = state["problems"]
     status = ("Final report passed all checks." if not problems
               else "Final report still has problems:\n- " + "\n- ".join(problems))
