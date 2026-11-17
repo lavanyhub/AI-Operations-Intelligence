@@ -1,8 +1,7 @@
-﻿venv/
-.venv/
-node_modules/
-__pycache__/
-.env
-*.log
-dist/
 data/raw/
+data/uploads/
+.env
+venv/
+.venv/
+__pycache__/
+node_modules/
